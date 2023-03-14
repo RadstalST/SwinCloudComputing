@@ -1,18 +1,5 @@
 Resources:
-  PublicSubnetTwo:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: '10.0.2.0/24' #allow
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      Tags:
-        - Key: Name
-          Value: PublicSubnetTwo
-      MapPublicIpOnLaunch: true
-
-
-
-
+ 
   Ec2Instance:
     Type: 'AWS::EC2::Instance'
     Properties:
