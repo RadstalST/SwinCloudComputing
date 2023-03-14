@@ -1,35 +1,4 @@
 Resources:
-  KeyPair:
-    Type: AWS::EC2::KeyPair
-    Properties: 
-      KeyName: CloudFormationKeyPair
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: '10.0.0.0/16' #allow 10.0.0.0 to 10.0.255.255 for the VPC */16 is in bytes and for the mask
-  PublicSubnetOne:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: '10.0.1.0/24' #allow 10.0.1.0 to 10.0.1.255
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      Tags:
-        - Key: Name
-          Value: PublicSubnetOne
-
-      MapPublicIpOnLaunch: true
-      
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-
-  GatewayAttachement:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref 'VPC'
-      InternetGatewayId: !Ref 'InternetGateway'
-
-
-
   PublicSubnetTwo:
     Type: AWS::EC2::Subnet
     Properties:
@@ -69,7 +38,8 @@ Resources:
         find /var/www -type d -exec sudo chmod 2775 {} \;
         find /var/www -type f -exec sudo chmod 0664 {} \;
         echo "<?php echo '<h2>Welcome to COS80001. Installed PHP version: ' . phpversion() . '</h2>'; ?>" > /var/www/html/phpinfo.php
-
+        echo '<!doctypehtml><html lang="en"><head><meta charset="utf-8"><title>Photo Album</title></head><body><h2>Photo lookup</h2><form id="upload"name="upload"><fieldset><dl><dt><label for="phototitle">Photo title:</label></dt><dd><input id="phototitle"name="phototitle"size="25"></dd><dt><label for="keyword">Keyword:</label></dt><dd><input id="keyword"name="keyword"size="25"></dd><dt><label for="fromdate">From Date:</label></dt><dd><input id="fromdate"name="fromdate"type="date"></dd><dt><label for="todate">To Date:</label></dt><dd><input id="todate"name="todate"type="date"></dd><dt><input type="submit"value="Search"></dt></dl></fieldset></form><p><a href="photouploader.php"title="Photo Uploader">Photo Uploader</a></p></body></html>'> /var/www/html/photolookup.php
+        echo '<!doctypehtml><html lang="en"><head><meta charset="utf-8"><title>Photo Album</title></head><body><h2>Photo uploader</h2><form id="upload"name="upload"><fieldset><dl><dt><label for="phototitle">Photo title:</label></dt><dd><input id="phototitle"name="phototitle"size="25"></dd><dt><label for="selectphoto">Select a photo:</label></dt><dd><input id="selectphoto"name="selectphoto"type="file"></dd><dt><label for="description">Description:</label></dt><dd><input id="description"name="description"size="25"></dd><dt><label for="date">Date:</label></dt><dd><input id="date"name="date"type="date"></dd><dt id="keywordid"><label for="keywords">Keywords (comma-delimited e.g. keyword1; keyword 2, ...):</label> <input id="keywords"name="keywords"size="25"></dt><dt><input type="submit"value="Upload"></dt></dl></fieldset></form><p><a href="photolookup.php"title="Photo Lookup">Photo Lookup</a></p></body></html>'>photouploader.php
 
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
