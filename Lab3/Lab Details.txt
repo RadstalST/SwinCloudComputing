@@ -1,0 +1,14 @@
+# this is a tempory access keys that would be regenerate every lab session
+SecretKey	IWHOYQCjHoq7QeNNM9RsEG6wpU0hQicF2k4w7mmy
+BastionHost	54.208.27.184
+Region	us-east-1
+AvailabilityZone	us-east-1a
+AccessKey	AKIARR7F5M7OH2OJWZXY
+LabInstance	44.195.48.92
+
+InstanceId i-00092a7a3b0164d8d
+VolumeId vol-020d5e4125bebbddc
+myVolumeId vol-0073bfb7fbcbe8625
+SnapshotId snap-097504ff8bb9d1ece
+
+BackupVolumeId vol-0b0b7a823e8ab8b01

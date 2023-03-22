@@ -3,7 +3,7 @@
 serve httpd webserver using ec2 and upload php file to EC2 instances 
 
 ## steps
-1. create keypair
+1. create keypair // or use vockey
 2. edit keypairname for ec2 instance in cloudformation template
 3. upload cloudformation stack to aws cloudformation
 4. upload webserver php file to ec2 instances
