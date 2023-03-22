@@ -8,7 +8,7 @@ Resources:
           Value: WebServer
       SecurityGroups:
         - !Ref InstanceSecurityGroup
-      KeyName: testCloudformation_manual
+      KeyName: vockey
       ImageId: ami-005f9685cb30f234b
       InstanceType: t2.micro
       UserData: !Base64 |
@@ -49,4 +49,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
           CidrIp: 0.0.0.0/0
