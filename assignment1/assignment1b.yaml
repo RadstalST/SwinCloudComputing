@@ -1,0 +1,380 @@
+Parameters:
+  DBPassword:
+    Type: String
+    Default: "password"
+    NoEcho: true
+    Description: "Database password"
+  DBName:
+    Type: String
+    Default: "assignment1b"
+    Description: "Database name"
+  FirstnameInitials:
+    Type: String
+    Default: "S"
+    Description: "First initials"
+  Lastname:
+    Type: String
+    Default: "Tangjarukij"
+    Description: "Last name"
+
+  Prefix:
+    Type: String
+    Default: "assignment1b"
+    Description: "Prefix for all resources"
+  Region:
+    Type: String
+    Default: "us-east-1"
+    Description: "AWS region"
+
+  AMI:
+    Type: String
+    Default: "ami-005f9685cb30f234b"
+    Description: "AMI ID"
+
+  InstanceType:
+    Type: String
+    Default: "t2.micro"
+    Description: "Instance type"
+  KeyName:
+    Type: String
+    Default: "vockey"
+    Description: "Keypair name"
+Resources:
+  # vpc starts here
+  VPC:
+    Type: AWS::EC2::VPC # the main thing that we are concerned with
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "$${Prefix}_{FirstnameInitials}${Lastname}-VPC"
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PublicSubnet1"
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.1.0/24"
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PublicSubnet2"
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.2.0/24"
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PrivateSubnet1"
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.3.0/24"
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PrivateSubnet2"
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.4.0/24"
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
+    
+  #internet gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_InternetGateway"
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  #nat gateway
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_NatGateway"
+  #RouteTables
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PublicRouteTable"
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PrivateRouteTable"
+  ## Public
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+  ### Subnet Associations
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  ## Private
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGateway
+
+  ### Subnet Associations
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+  #subnet groups
+  PublicSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Public Subnet Group"
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+  RDSInstanceSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Private Subnet Group For RDS Instance"
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+  #instances
+  TestInstanceEC2:
+    Type: AWS::EC2::Instance
+    DependsOn: 
+      - TestInstanceSG
+      - PrivateSubnet1
+    Properties:
+      ImageId: !Sub "${AMI}"
+      InstanceType: !Sub "${InstanceType}"
+      KeyName: !Sub "${KeyName}"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_TestInstanceEC2"
+      NetworkInterfaces:
+        - DeviceIndex: "0"
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref PrivateSubnet2
+          GroupSet:
+            - !Ref TestInstanceSG
+  WebServerEC2:
+    Type: AWS::EC2::Instance
+    DependsOn: 
+      - WebServerSG
+      - PublicSubnet1
+    Properties:
+      ImageId: !Sub "${AMI}"
+      InstanceType: !Sub "${InstanceType}"
+      KeyName: !Sub "${KeyName}"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_WebServerEC2"
+      NetworkInterfaces:
+        - DeviceIndex: "0"
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnet2
+          GroupSet:
+            - !Ref WebServerSG
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DependsOn: 
+      - DBServerSG
+      - RDSInstanceSubnetGroup
+    Properties:
+      DBInstanceClass: db.t3.micro
+      Engine: mysql
+      EngineVersion: "8.0.25"
+      PubliclyAccessible: false
+      MultiAZ: false
+      DBSubnetGroupName: !Ref RDSInstanceSubnetGroup
+      MasterUsername: root
+      MasterUserPassword: !Sub "${DBPassword}"
+      DBName: !Sub "${DBName}"
+      AllocatedStorage: "20"
+      StorageType: gp2
+      VPCSecurityGroups:
+        - !Ref DBServerSG
+  # bastion host
+  BastionHostEC2:
+    Type: AWS::EC2::Instance
+    DependsOn: 
+      - BastionHostSG
+      - PublicSubnet2
+    Properties:
+      ImageId: !Sub "${AMI}"
+      InstanceType: !Sub "${InstanceType}"
+      KeyName: !Sub "${KeyName}"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_BastionHostEC2"
+      NetworkInterfaces:
+        - DeviceIndex: "0"
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnet2
+          GroupSet:
+            - !Ref BastionHostSG
+
+
+
+  #NACLs
+  PublicSubnet2NACL:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PublicSubnet2NACL"
+  PublicSubnet2InboundRule1:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:     
+      NetworkAclId: !Ref PublicSubnet2NACL
+      Protocol: 6 #TCP
+      RuleNumber: 100
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 22
+        To: 22
+  # PublicSubnet2InboundRule2:
+  #   Type: AWS::EC2::NetworkAclEntry
+  #   Properties:
+  #     NetworkAclId: !Ref PublicSubnet2NACL
+  #     Protocol: 6 #TCP
+  #     RuleNumber: 110
+  #     RuleAction: allow
+  #     CidrBlock: "0.0.0.0/0"
+  #     PortRange:
+  #       From: 80
+  #       To: 80
+  PublicSubnet2InboundRule3: #allow inbound icmp
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicSubnet2NACL
+      Egress: true
+      Protocol: 1 #ICMP
+      RuleNumber: 120
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      Icmp:
+        Code: -1
+        Type: -1
+  PublicSubnet2InboundRule4: #allow outbound icmp
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicSubnet2NACL
+      Protocol: 1 #ICMP
+      RuleNumber: 130
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      Icmp:
+        Code: -1
+        Type: -1
+
+  
+
+  #security groups
+
+  BastionHostSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and HTTP access
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+
+  TestInstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and HTTP access
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_TestInstanceSG"
+          
+  WebServerSG:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: TestInstanceSG
+    Properties:
+      GroupDescription: Enable SSH and HTTP access and icmp from TestInstanceSG
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_WebServerSG"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          SourceSecurityGroupId: !GetAtt TestInstanceSG.GroupId
+      
+  DBServerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EnableMYSQL access from WebServerSG
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_DBServerSG"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !GetAtt WebServerSG.GroupId
+      

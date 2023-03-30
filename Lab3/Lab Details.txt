@@ -6,9 +6,9 @@ AvailabilityZone	us-east-1a
 AccessKey	AKIARR7F5M7OH2OJWZXY
 LabInstance	44.195.48.92
 
-InstanceId i-00092a7a3b0164d8d
+InstanceId i-065ae5129240d0672
 VolumeId vol-020d5e4125bebbddc
-myVolumeId vol-0073bfb7fbcbe8625
+myVolumeId vol-050b110c7fb88c134
 SnapshotId snap-097504ff8bb9d1ece
 
 BackupVolumeId vol-0b0b7a823e8ab8b01
