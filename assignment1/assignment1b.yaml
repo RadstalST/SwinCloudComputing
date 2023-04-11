@@ -1,12 +1,12 @@
 Parameters:
   DBPassword:
     Type: String
-    Default: "password"
+    Default: "admin123"
     NoEcho: true
     Description: "Database password"
   DBName:
     Type: String
-    Default: "assignment1b"
+    Default: "photoalbum"
     Description: "Database name"
   FirstnameInitials:
     Type: String
@@ -16,7 +16,10 @@ Parameters:
     Type: String
     Default: "Tangjarukij"
     Description: "Last name"
-
+  Project:
+    Type: String
+    Default: "assignment1b"
+    Description: "Project name"
   Prefix:
     Type: String
     Default: "assignment1b"
@@ -49,7 +52,7 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub "$${Prefix}_{FirstnameInitials}${Lastname}-VPC"
+          Value: !Sub "${Prefix}_${FirstnameInitials}${Lastname}-VPC"
 
   PublicSubnet1:
     Type: AWS::EC2::Subnet
@@ -100,20 +103,7 @@ Resources:
     Properties:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
-
-  #nat gateway
-  NatGatewayEIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGatewayEIP.AllocationId
-      SubnetId: !Ref PublicSubnet2
-      Tags:
-        - Key: Name
-          Value: !Sub "${Prefix}_NatGateway"
+  
   #RouteTables
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -150,14 +140,12 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
   ## Private
-  PrivateRoute:
-    Type: AWS::EC2::Route
-    DependsOn: InternetGateway
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: "0.0.0.0/0"
-      NatGatewayId: !Ref NatGateway
-
+  # PrivateRoute:
+  #   Type: AWS::EC2::Route
+  #   DependsOn: InternetGateway
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     DestinationCidrBlock: "0.0.0.0/0"
   ### Subnet Associations
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -169,14 +157,16 @@ Resources:
     Properties:
       SubnetId: !Ref PrivateSubnet2
       RouteTableId: !Ref PrivateRouteTable
+
+
   #subnet groups
-  PublicSubnetGroup:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: "Public Subnet Group"
-      SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+  # PublicSubnetGroup:
+  #   Type: AWS::RDS::DBSubnetGroup
+  #   Properties:
+  #     DBSubnetGroupDescription: "Public Subnet Group"
+  #     SubnetIds:
+  #       - !Ref PublicSubnet1
+  #       - !Ref PublicSubnet2
   RDSInstanceSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
@@ -188,7 +178,6 @@ Resources:
   TestInstanceEC2:
     Type: AWS::EC2::Instance
     DependsOn: 
-      - TestInstanceSG
       - PrivateSubnet1
     Properties:
       ImageId: !Sub "${AMI}"
@@ -196,17 +185,19 @@ Resources:
       KeyName: !Sub "${KeyName}"
       Tags:
         - Key: Name
-          Value: !Sub "${Prefix}_TestInstanceEC2"
+          Value: !Sub "${Prefix}_Test Instance"
       NetworkInterfaces:
         - DeviceIndex: "0"
           AssociatePublicIpAddress: true
           SubnetId: !Ref PrivateSubnet2
           GroupSet:
             - !Ref TestInstanceSG
+
+
+
   WebServerEC2:
     Type: AWS::EC2::Instance
     DependsOn: 
-      - WebServerSG
       - PublicSubnet1
     Properties:
       ImageId: !Sub "${AMI}"
@@ -214,51 +205,57 @@ Resources:
       KeyName: !Sub "${KeyName}"
       Tags:
         - Key: Name
-          Value: !Sub "${Prefix}_WebServerEC2"
+          Value: !Sub "${Prefix}_Bastion/Web server"
       NetworkInterfaces:
         - DeviceIndex: "0"
           AssociatePublicIpAddress: true
           SubnetId: !Ref PublicSubnet2
           GroupSet:
             - !Ref WebServerSG
+      UserData:
+        Fn::Base64: |
+            #!/bin/bash
+            yum update -y
+            amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+            service httpd start
+            yum install -y httpd mariadb-server php-mbstring php-xml git
+            systemctl start httpd
+            systemctl enable httpd
+            usermod -a -G apache ec2-user
+            chown -R ec2-user:apache /var/www
+            chmod 2775 /var/www
+            find /var/www -type d -exec sudo chmod 2775 {} \;
+            find /var/www -type f -exec sudo chmod 0664 {} \;
+            echo "<?php phpinfo(); ?>" > /var/www/html/phpinfo.php
+            git clone https://github.com/RadstalST/PhotoAlabum3.0.git /var/www/html/cos80001/photoalbum
+          
   DBInstance:
     Type: AWS::RDS::DBInstance
     DependsOn: 
       - DBServerSG
       - RDSInstanceSubnetGroup
     Properties:
-      DBInstanceClass: db.t3.micro
+      DBInstanceClass: db.t2.micro
       Engine: mysql
       EngineVersion: "8.0.25"
       PubliclyAccessible: false
       MultiAZ: false
       DBSubnetGroupName: !Ref RDSInstanceSubnetGroup
-      MasterUsername: root
+      MasterUsername: admin
       MasterUserPassword: !Sub "${DBPassword}"
       DBName: !Sub "${DBName}"
+      AvailabilityZone: !GetAtt PrivateSubnet1.AvailabilityZone
       AllocatedStorage: "20"
       StorageType: gp2
       VPCSecurityGroups:
         - !Ref DBServerSG
-  # bastion host
-  BastionHostEC2:
-    Type: AWS::EC2::Instance
-    DependsOn: 
-      - BastionHostSG
-      - PublicSubnet2
-    Properties:
-      ImageId: !Sub "${AMI}"
-      InstanceType: !Sub "${InstanceType}"
-      KeyName: !Sub "${KeyName}"
       Tags:
         - Key: Name
-          Value: !Sub "${Prefix}_BastionHostEC2"
-      NetworkInterfaces:
-        - DeviceIndex: "0"
-          AssociatePublicIpAddress: true
-          SubnetId: !Ref PublicSubnet2
-          GroupSet:
-            - !Ref BastionHostSG
+          Value: !Sub "${Prefix}_RDS Instance"
+
+
+
+  
 
 
 
@@ -270,64 +267,69 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${Prefix}_PublicSubnet2NACL"
-  PublicSubnet2InboundRule1:
+  # PublicSubnet2NACLAssociation:
+  #   Type: AWS::EC2::SubnetNetworkAclAssociation
+  #   Properties:
+  #     SubnetId: !Ref PublicSubnet2
+  #     NetworkAclId: !Ref PublicSubnet2NACL
+  # allow ssh inbound
+  SSHInboundRule1:
     Type: AWS::EC2::NetworkAclEntry
     Properties:     
       NetworkAclId: !Ref PublicSubnet2NACL
-      Protocol: 6 #TCP
+      Protocol: "6" #TCP
+      RuleNumber: "101"
+      RuleAction: "allow"
+      CidrBlock: "0.0.0.0/0"
+      Egress: false
+      PortRange:
+        From: "22"
+        To: "22"
+  SSHOutboundRule1:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:     
+      NetworkAclId: !Ref PublicSubnet2NACL
+      Protocol: "6" #TCP
+      RuleNumber: "101"
+      RuleAction: "allow"
+      CidrBlock: "0.0.0.0/0"
+      Egress: true
+      PortRange:
+        From: "22"
+        To: "22"
+  #Allow ICMP inbound and outbound
+  ICMPInboundRule1:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:     
+      NetworkAclId: !Ref PublicSubnet2NACL
+      Protocol: 1 #ICMP
       RuleNumber: 100
       RuleAction: allow
       CidrBlock: "0.0.0.0/0"
+      Egress: false
       PortRange:
-        From: 22
-        To: 22
-  # PublicSubnet2InboundRule2:
-  #   Type: AWS::EC2::NetworkAclEntry
-  #   Properties:
-  #     NetworkAclId: !Ref PublicSubnet2NACL
-  #     Protocol: 6 #TCP
-  #     RuleNumber: 110
-  #     RuleAction: allow
-  #     CidrBlock: "0.0.0.0/0"
-  #     PortRange:
-  #       From: 80
-  #       To: 80
-  PublicSubnet2InboundRule3: #allow inbound icmp
+        From: 0
+        To: 65535
+      Icmp:
+        Code: -1
+        Type: -1
+  ICMPOutboundRule1:
     Type: AWS::EC2::NetworkAclEntry
-    Properties:
+    Properties:     
       NetworkAclId: !Ref PublicSubnet2NACL
+      Protocol: 1 #ICMP
+      RuleNumber: 100
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
       Egress: true
-      Protocol: 1 #ICMP
-      RuleNumber: 120
-      RuleAction: allow
-      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 0
+        To: 65535
       Icmp:
         Code: -1
         Type: -1
-  PublicSubnet2InboundRule4: #allow outbound icmp
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref PublicSubnet2NACL
-      Protocol: 1 #ICMP
-      RuleNumber: 130
-      RuleAction: allow
-      CidrBlock: "0.0.0.0/0"
-      Icmp:
-        Code: -1
-        Type: -1
-
-  
 
   #security groups
-
-  BastionHostSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable SSH and HTTP access
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: "-1"
-          CidrIp: "0.0.0.0/0"
 
   TestInstanceSG:
     Type: AWS::EC2::SecurityGroup
@@ -364,6 +366,7 @@ Resources:
           ToPort: -1
           SourceSecurityGroupId: !GetAtt TestInstanceSG.GroupId
       
+      
   DBServerSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -377,4 +380,44 @@ Resources:
           FromPort: 3306
           ToPort: 3306
           SourceSecurityGroupId: !GetAtt WebServerSG.GroupId
-      
+
+
+  PhotoStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Prefix}-bucket"
+      # AccessControl: PublicRead
+      #no acl
+
+      Tags:
+        - Key: Name
+          Value: !Sub "${Prefix}_PhotoStorageBucket"
+
+  PhotoPublicAccessPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PhotoStorageBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${PhotoStorageBucket}/*"
+Outputs:
+  WebInstancePublicDNS:
+    Description: Public DNS of the EC2 instance
+    Value: !GetAtt WebServerEC2.PublicDnsName
+  WebInstancePrivateIP:
+    Description: Private IP of the EC2 instance
+    Value: !GetAtt WebServerEC2.PrivateIp
+  TestInstancePrivateIP:
+    Description: Private IP of the EC2 instance
+    Value: !GetAtt TestInstanceEC2.PrivateIp
+  DBinstanceEndpoint:
+    Description: Endpoint of the RDS instance
+    Value: !GetAtt DBInstance.Endpoint.Address
+ 
+    
