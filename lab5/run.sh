@@ -14,7 +14,6 @@ DB_SC_ID=$(aws --profile $AWS_PROFILE ec2 create-security-group \
 --group-name 'DB Security Group' --vpc-id $VPC_ID |\
 python get_security_group_id.py
 )
-# DB_SC_ID="sg-05be0d389dd99985c"
 echo "DB_SC_ID=$DB_SC_ID"
 
 echo "retiving \"Web Security Group\""
