@@ -1,4 +1,4 @@
-# assignment 1a
+# assignment1a
 
 serve httpd webserver using ec2 and upload php file to EC2 instances 
 
@@ -29,3 +29,30 @@ eg
 
 [the over complicated but standard cloudformation practice
 ](https://reflectoring.io/aws-cloudformation-deploy-docker-image/)
+
+
+# assigment1b
+
+## steps
+1. deploy cloudformation stack
+2. wait for RDS instance to be ready
+3. SSH into Webserver Instance and edit DB_endpoint in /var/www/html/cos80001/photoalbum/constraints.php
+4. SSH into TestInstance and then ping to Webserver using private IP address.
+4. open webserver publicname in browser and enjoy
+
+## Rubrics Checklist
+### Architecture
+- [X] VPC with 2 public and 2 private subnets
+- [X] Correct Public and Private Routing tables with correct subnet associations
+- [X] Security groups properly configured and attached.
+- [ ] Network ACL properly configured and attached
+- [X] Correct Web server and Test instances running in correct subnets
+- [ ] Database schema as specified
+- [ ] Database running in correct subnets
+- [X] S3 objects publicly accessible, using proper access policy
+### Functionality
+- [ ] album.php page displayed from EC2 Web server
+- [ ] Provided URL is persistent (Elastic IP Association)
+- [ ] Photos loaded from S3 with matching metadata from RDS
+- [ ] Web server instance reachable from Test instance via ICMP
+
